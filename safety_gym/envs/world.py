@@ -16,14 +16,14 @@ Tools that allow the Safety Gym Engine to interface to MuJoCo.
 The World class owns the underlying mujoco scene and the XML,
 and is responsible for regenerating the simulator.
 
-The way to use this is to configure a World() based on your needs 
+The way to use this is to configure a World() based on your needs
 (number of objects, etc) and then call `world.reset()`.
 
 *NOTE:* The simulator should be accessed as `world.sim` and not just
 saved separately, because it may change between resets.
 
 Configuration is idiomatically done through Engine configuration,
-so any changes to this configuration should also be reflected in 
+so any changes to this configuration should also be reflected in
 changes to the Engine.
 
 TODO:
@@ -182,7 +182,7 @@ class World:
         # Build and add a tracking camera (logic needed to ensure orientation correct)
         theta = self.robot_rot
         xyaxes = dict(
-                    x1=np.cos(theta), 
+                    x1=np.cos(theta),
                     x2=-np.sin(theta),
                     x3=0,
                     y1=np.sin(theta),

@@ -13,13 +13,13 @@ ROBOT_XMLS = {name: f'xmls/{name.lower()}.xml' for name in ROBOT_NAMES}
 BASE_SENSORS = ['accelerometer', 'velocimeter', 'gyro', 'magnetometer']
 EXTRA_SENSORS = {
     'Doggo': [
-        'touch_ankle_1a', 
-        'touch_ankle_2a', 
-        'touch_ankle_3a', 
+        'touch_ankle_1a',
+        'touch_ankle_2a',
+        'touch_ankle_3a',
         'touch_ankle_4a',
-        'touch_ankle_1b', 
-        'touch_ankle_2b', 
-        'touch_ankle_3b', 
+        'touch_ankle_1b',
+        'touch_ankle_2b',
+        'touch_ankle_3b',
         'touch_ankle_4b'
         ],
 }
@@ -149,7 +149,7 @@ goal2 = {
     'cam_fixedtopdown_pos': [0, 0, 5.5],
     'constrain_vases': True,
     'hazards_num': 10,
-    'vases_num': 10  
+    'vases_num': 10
 }
 goal2.update(goal_constrained)
 
