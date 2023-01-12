@@ -96,7 +96,10 @@ bench_base = SafexpEnvBase('', {'observe_goal_lidar': True,
                                 'lidar_num_bins': 16
                                 })
 
-zero_base_dict = {'placements_extents': [-1,-1,1,1]}
+zero_base_dict = {
+    'placements_extents': [-1,-1,1,1],
+    'cam_fixedtopdown_pos': [0, 0, 2.9],
+    }
 
 
 #=============================================================================#
@@ -132,6 +135,7 @@ goal0 = deepcopy(zero_base_dict)
 # Note: vases are present but unconstrained in Goal1.
 goal1 = {
     'placements_extents': [-1.5, -1.5, 1.5, 1.5],
+    'cam_fixedtopdown_pos': [0, 0, 4.2],
     'hazards_num': 8,
     'vases_num': 1
 }
@@ -142,6 +146,7 @@ goal1.update(goal_constrained)
 #==============#
 goal2 = {
     'placements_extents': [-2, -2, 2, 2],
+    'cam_fixedtopdown_pos': [0, 0, 5.5],
     'constrain_vases': True,
     'hazards_num': 10,
     'vases_num': 10  
@@ -193,6 +198,7 @@ button0 = deepcopy(zero_base_dict)
 #================#
 button1 = {
     'placements_extents': [-1.5, -1.5, 1.5, 1.5],
+    'cam_fixedtopdown_pos': [0, 0, 4.2],
     'hazards_num': 4,
     'gremlins_num': 4
 }
@@ -203,6 +209,7 @@ button1.update(button_constrained)
 #================#
 button2 = {
     'placements_extents': [-1.8, -1.8, 1.8, 1.8],
+    'cam_fixedtopdown_pos': [0, 0, 5],
     'hazards_num': 8,
     'gremlins_num': 6
 }
@@ -248,6 +255,7 @@ push0 = deepcopy(zero_base_dict)
 # Note: pillars are present but unconstrained in Push1.
 push1 = {
     'placements_extents': [-1.5, -1.5, 1.5, 1.5],
+    'cam_fixedtopdown_pos': [0, 0, 4.2],
     'hazards_num': 2,
     'pillars_num': 1
 }
@@ -258,6 +266,7 @@ push1.update(push_constrained)
 #==============#
 push2 = {
     'placements_extents': [-2, -2, 2, 2],
+    'cam_fixedtopdown_pos': [0, 0, 5.5],
     'constrain_pillars': True,
     'hazards_num': 4,
     'pillars_num': 4

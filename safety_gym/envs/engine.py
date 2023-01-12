@@ -105,6 +105,9 @@ class Engine(gym.Env, gym.utils.EzPickle):
         # Floor
         'floor_display_mode': False,  # In display mode, the visible part of the floor is cropped
 
+        # Top-down camera
+        'cam_fixedtopdown_pos': [0, 0, 9],
+
         # Robot
         'robot_placements': None,  # Robot placements list (defaults to full extents)
         'robot_locations': [],  # Explicitly place robot XY coordinate
@@ -651,6 +654,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if self.floor_display_mode:
             floor_size = max(self.placements_extents)
             world_config['floor_size'] = [floor_size + .1, floor_size + .1, 1]
+            world_config['cam_fixedtopdown_pos'] = self.cam_fixedtopdown_pos
 
         #if not self.observe_vision:
         #    world_config['render_context'] = -1  # Hijack this so we don't create context

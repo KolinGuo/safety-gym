@@ -56,6 +56,7 @@ class World:
         'robot_rot': 0,  # Robot rotation about Z axis
 
         'floor_size': [3.5, 3.5, .1],  # Used for displaying the floor
+        'cam_fixedtopdown_pos': [0, 0, 9],  # Used for positioning topdown camera
 
         # Objects -- this is processed and added by the Engine class
         'objects': {},  # map from name -> object dict
@@ -170,7 +171,9 @@ class World:
                 g.update({'@size': convert(self.floor_size), '@rgba': '1 1 1 1', '@material': 'MatPlane'})
 
         # Add cameras to the XML dictionary
-        cameras = xmltodict.parse('''<b>
+        cam_fixedtopdown_pos = ' '.join([str(v) for v in self.cam_fixedtopdown_pos])
+        cameras = xmltodict.parse(f'''<b>
+            <camera name="fixedtopdown" pos="{cam_fixedtopdown_pos}" zaxis="0 0 1"/>
             <camera name="fixednear" pos="0 -2 2" zaxis="0 -1 1"/>
             <camera name="fixedfar" pos="0 -5 5" zaxis="0 -1 1"/>
             </b>''')
