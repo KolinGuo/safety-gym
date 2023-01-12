@@ -1431,6 +1431,9 @@ class Engine(gym.Env, gym.utils.EzPickle):
                 self.viewer.cam.fixedcamid = -1
                 self.viewer.cam.type = const.CAMERA_FREE
             else:
+                # https://github.com/openai/mujoco-py/issues/390#issuecomment-525385434
+                mujoco_py.GlfwContext(offscreen=True, quiet=True)  # Create a window to init GLFW
+
                 self.viewer = MjRenderContextOffscreen(self.sim)
                 self.viewer._hide_overlay = True
                 self.viewer.cam.fixedcamid = camera_id #self.model.camera_name2id(mode)
