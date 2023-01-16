@@ -9,9 +9,13 @@ from collections import OrderedDict
 import mujoco_py
 from mujoco_py import MjViewer, MujocoException, const, MjRenderContextOffscreen
 
+# https://github.com/openai/mujoco-py/issues/390#issuecomment-525385434
+mujoco_py.GlfwContext(offscreen=True, quiet=True)  # Create a window to init GLFW
+
 from safety_gym.envs.world import World, Robot
 
 import sys
+from typing import Union
 
 
 # Distinct colors for different types of objects.
@@ -141,6 +145,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         'observe_buttons': False,  # Lidar observation of button object positions
         'observe_gremlins': False,  # Gremlins are observed with lidar-like space
         'observe_vision': False,  # Observe vision from the robot
+        'observe_topdown_img_only': False,  # Observe image from a top-down camera only
         # These next observations are unnormalized, and are only for debugging
         'observe_qpos': False,  # Observe the qpos of the world
         'observe_qvel': False,  # Observe the qvel of the robot
@@ -155,9 +160,10 @@ class Engine(gym.Env, gym.utils.EzPickle):
         'render_lidar_size': 0.025,
         'render_lidar_offset_init': 0.5,
         'render_lidar_offset_delta': 0.06,
+        'render_goal_button_alpha': 0.1,  # Transparency of rendering goal button
 
         # Vision observation parameters
-        'vision_size': (60, 40),  # Size (width, height) of vision observation; gets flipped internally to (rows, cols) format
+        'vision_size': (40, 60),  # Size (height, width) of vision observation; gets flipped internally to (rows, cols) format
         'vision_render': True,  # Render vision observation in the viewer
         'vision_render_size': (300, 200),  # Size to render the vision in the viewer
 
@@ -239,6 +245,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         'constrain_buttons': False,  # Penalize pressing incorrect buttons
         'constrain_gremlins': False,  # Moving objects that must be avoided
         'constrain_indicator': True,  # If true, all costs are either 1 or 0 for a given step.
+        'constrain_terminate': False,  # If true, terminate when any constraint is violated
 
         # Hazardous areas
         'hazards_num': 0,  # Number of hazards in an environment
@@ -312,6 +319,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         self.build_observation_space()
         self.build_placements_dict()
 
+        self._viewers = {}
         self.viewer = None
         self.world = None
         self.clear()
@@ -323,6 +331,13 @@ class Engine(gym.Env, gym.utils.EzPickle):
         ''' Parse a config dict - see self.DEFAULT for description '''
         self.config = deepcopy(self.DEFAULT)
         self.config.update(deepcopy(config))
+        # Observation config override
+        if self.config['observe_topdown_img_only']:
+            for key, value in self.config.items():
+                if key.startswith('observe_'):
+                    self.config[key] = False
+            self.config['observe_topdown_img_only'] = True
+
         for key, value in self.config.items():
             assert key in self.DEFAULT, f'Bad key {key}'
             setattr(self, key, value)
@@ -341,6 +356,21 @@ class Engine(gym.Env, gym.utils.EzPickle):
     def data(self):
         ''' Helper to get the world's simulation data instance '''
         return self.sim.data
+
+    @property
+    def dt(self):
+        ''' Time passed for one step() call '''
+        return self.model.opt.timestep * self.frameskip_binom_n
+
+    @property
+    def metadata(self):
+        ''' Metadata of environment '''
+        metadata = {
+            'render_modes': ['human', 'rgb_array', 'depth_array'],
+        }
+        if self.frameskip_binom_p == 1.0:
+            metadata['video.frames_per_second']: int(np.round(1.0 / self.dt))
+        return metadata
 
     @property
     def robot_pos(self):
@@ -477,10 +507,9 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if self.observe_ctrl:
             obs_space_dict['ctrl'] = gym.spaces.Box(-np.inf, np.inf, (self.robot.nu,), dtype=np.float32)
         if self.observe_vision:
-            width, height = self.vision_size
-            rows, cols = height, width
-            self.vision_size = (rows, cols)
             obs_space_dict['vision'] = gym.spaces.Box(0, 1.0, self.vision_size + (3,), dtype=np.float32)
+        if self.observe_topdown_img_only:
+            obs_space_dict['image'] = gym.spaces.Box(0, 255, self.vision_size + (3,), dtype=np.uint8)
         # Flatten it ourselves
         self.obs_space_dict = obs_space_dict
         if self.observation_flatten:
@@ -958,8 +987,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
     def obs_vision(self):
         ''' Return pixels from the robot camera '''
         # Get a render context so we can
-        rows, cols = self.vision_size
-        width, height = cols, rows
+        height, width = self.vision_size
         vision = self.sim.render(width, height, camera_name='vision', mode='offscreen')
         return np.array(vision, dtype='float32') / 255
 
@@ -1115,6 +1143,13 @@ class Engine(gym.Env, gym.utils.EzPickle):
             obs['ctrl'] = self.data.ctrl.copy()
         if self.observe_vision:
             obs['vision'] = self.obs_vision()
+        if self.observe_topdown_img_only:
+            height, width = self.vision_size
+            obs['image'] = self.render(
+                    mode='rgb_array',
+                    camera_id=self.model.camera_name2id('fixedtopdown'),
+                    width=width, height=height,
+                    render_cost_indicator=False)
         if self.observation_flatten:
             flat_obs = np.zeros(self.obs_flat_size)
             offset = 0
@@ -1300,6 +1335,10 @@ class Engine(gym.Env, gym.utils.EzPickle):
                 else:
                     self.done = True
 
+            # Terminate on constraint violation
+            if self.constrain_terminate and info['cost'] > 0:
+                self.done = True
+
         # Timeout
         self.steps += 1
         if self.steps >= self.num_steps:
@@ -1420,33 +1459,19 @@ class Engine(gym.Env, gym.utils.EzPickle):
                mode='human',
                camera_id=None,
                width=DEFAULT_WIDTH,
-               height=DEFAULT_HEIGHT
-               ):
-        ''' Render the environment to the screen '''
+               height=DEFAULT_HEIGHT,
+               **kwargs):
+        ''' Render the environment to the screen
+        'kwargs' can contain
+            'render_cost_indicator'  # Render red sphere to indicate nonzero cost
+        '''
 
-        if self.viewer is None or mode!=self._old_render_mode:
-            # Set camera if specified
-            if mode == 'human':
-                self.viewer = MjViewer(self.sim)
-                self.viewer.cam.fixedcamid = -1
-                self.viewer.cam.type = const.CAMERA_FREE
-            else:
-                # https://github.com/openai/mujoco-py/issues/390#issuecomment-525385434
-                mujoco_py.GlfwContext(offscreen=True, quiet=True)  # Create a window to init GLFW
-
-                self.viewer = MjRenderContextOffscreen(self.sim)
-                self.viewer._hide_overlay = True
-                self.viewer.cam.fixedcamid = camera_id #self.model.camera_name2id(mode)
-                self.viewer.cam.type = const.CAMERA_FIXED
-            self.viewer.render_swap_callback = self.render_swap_callback
-            # Turn all the geom groups on
-            self.viewer.vopt.geomgroup[:] = 1
-            self._old_render_mode = mode
-        self.viewer.update_sim(self.sim)
+        self._get_viewer(mode).update_sim(self.sim)
 
         if camera_id is not None:
             # Update camera if desired
             self.viewer.cam.fixedcamid = camera_id
+            self.viewer.cam.type = const.CAMERA_FIXED
 
         # Lidar markers
         if self.render_lidar_markers:
@@ -1487,10 +1512,11 @@ class Engine(gym.Env, gym.utils.EzPickle):
 
         # Add goal marker
         if self.task == 'button':
-            self.render_area(self.goal_pos, self.buttons_size * 2, COLOR_BUTTON, 'goal', alpha=0.1)
+            self.render_area(self.goal_pos, self.buttons_size * 2, COLOR_BUTTON,
+                             'goal', alpha=self.render_goal_button_alpha)
 
         # Add indicator for nonzero cost
-        if self._cost.get('cost', 0) > 0:
+        if kwargs.get('render_cost_indicator', True) and self._cost.get('cost', 0) > 0:
             self.render_sphere(self.world.robot_pos(), 0.25, COLOR_RED, alpha=.5)
 
         # Draw vision pixels
@@ -1501,11 +1527,38 @@ class Engine(gym.Env, gym.utils.EzPickle):
             vision = np.array(vision, dtype='uint8')
             self.save_obs_vision = vision
 
-        if mode=='human':
+        if mode == 'human':
             self.viewer.render()
-        elif mode=='rgb_array':
+        elif mode == 'rgb_array':
             self.viewer.render(width, height)
             data = self.viewer.read_pixels(width, height, depth=False)
             self.viewer._markers[:] = []
             self.viewer._overlay.clear()
             return data[::-1, :, :]
+        elif mode == 'depth_array':
+            self.viewer.render(width, height)
+            data = self.viewer.read_pixels(width, height, depth=True)[1]
+            self.viewer._markers[:] = []
+            self.viewer._overlay.clear()
+            return data[::-1, :]
+
+    def _get_viewer(self, mode) -> Union[MjViewer, MjRenderContextOffscreen]:
+        self.viewer = self._viewers.get(mode)
+        if self.viewer is None:
+            if mode == "human":
+                self.viewer = MjViewer(self.sim)
+                self.viewer.cam.fixedcamid = -1
+                self.viewer.cam.type = const.CAMERA_FREE
+            elif mode in ["rgb_array", "depth_array"]:
+                self.viewer = MjRenderContextOffscreen(self.sim)
+                self.viewer._hide_overlay = True
+            else:
+                raise AttributeError(
+                    f"Unexpected mode: {mode}, expected modes: {self.metadata['render_modes']}"
+                )
+            self.viewer.render_swap_callback = self.render_swap_callback
+            # Turn all the geom groups on
+            self.viewer.vopt.geomgroup[:] = 1
+
+            self._viewers[mode] = self.viewer
+        return self.viewer
