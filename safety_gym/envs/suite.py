@@ -37,7 +37,7 @@ MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-img-v0
 MAKE_INDCOST_ENVIRONMENTS = True   # IndCost/Safexp-PointGoal2-img-v0
 MAKE_CONTCOST_ENVIRONMENTS = True  # ContCost/Safexp-PointGoal2-img-v0
 COST_ENV_EXTRA_CONFIGS = {
-    'CostTerm': {'constrain_terminate': True},
+    'CostTerm': {'constrain_terminate': True, 'cost_constrain_term': 1.0},
     'IndCost': {'constrain_indicator': True},
     'ContCost': {'constrain_indicator': False},
 }

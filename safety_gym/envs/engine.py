@@ -163,7 +163,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         'render_goal_button_alpha': 0.1,  # Transparency of rendering goal button
 
         # Vision observation parameters
-        'vision_size': (40, 60),  # Size (height, width) of vision observation; gets flipped internally to (rows, cols) format
+        'vision_size': (60, 40),  # Size (width, height) of vision observation; gets flipped internally to (rows, cols) format
         'vision_render': True,  # Render vision observation in the viewer
         'vision_render_size': (300, 200),  # Size to render the vision in the viewer
 
@@ -246,6 +246,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         'constrain_gremlins': False,  # Moving objects that must be avoided
         'constrain_indicator': True,  # If true, all costs are either 1 or 0 for a given step.
         'constrain_terminate': False,  # If true, terminate when any constraint is violated
+        'cost_constrain_term': 1.0,  # Cost for terminate with violated constraint
 
         # Hazardous areas
         'hazards_num': 0,  # Number of hazards in an environment
@@ -368,7 +369,31 @@ class Engine(gym.Env, gym.utils.EzPickle):
         metadata = {
             'render_modes': ['human', 'rgb_array', 'depth_array'],
         }
-        if self.frameskip_binom_p == 1.0:
+
+        # Number of constraints
+        #    hazards  : 1, not within
+        #    vases    : 2, no contact + zero velocity
+        #    buttons  : 1, no contact
+        #    pillars  : 1, no contact
+        #    gremlins : 1, no contact
+        active_constraints = []
+        if self.constrain_hazards:
+            active_constraints += ['cost_hazards']
+        if self.constrain_vases:
+            active_constraints += ['cost_vases_contact']
+        if self.constrain_vases and self.vases_displace_cost:
+            active_constraints += ['cost_vases_displace']
+        if self.constrain_vases and self.vases_velocity_cost:
+            active_constraints += ['cost_vases_velocity']
+        if self.constrain_pillars:
+            active_constraints += ['cost_pillars']
+        if self.constrain_buttons:
+            active_constraints += ['cost_buttons']
+        if self.constrain_gremlins:
+            active_constraints += ['cost_gremlins']
+        metadata['active_constraints'] = active_constraints
+
+        if np.isclose(self.frameskip_binom_p, 1.0):
             metadata['video.frames_per_second']: int(np.round(1.0 / self.dt))
         return metadata
 
@@ -507,9 +532,11 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if self.observe_ctrl:
             obs_space_dict['ctrl'] = gym.spaces.Box(-np.inf, np.inf, (self.robot.nu,), dtype=np.float32)
         if self.observe_vision:
-            obs_space_dict['vision'] = gym.spaces.Box(0, 1.0, self.vision_size + (3,), dtype=np.float32)
+            cols, rows = self.vision_size
+            obs_space_dict['vision'] = gym.spaces.Box(0, 1.0, (rows, cols, 3), dtype=np.float32)
         if self.observe_topdown_img_only:
-            obs_space_dict['image'] = gym.spaces.Box(0, 255, self.vision_size + (3,), dtype=np.uint8)
+            cols, rows = self.vision_size
+            obs_space_dict['image'] = gym.spaces.Box(0, 255, (rows, cols, 3), dtype=np.uint8)
         # Flatten it ourselves
         self.obs_space_dict = obs_space_dict
         if self.observation_flatten:
@@ -987,7 +1014,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
     def obs_vision(self):
         ''' Return pixels from the robot camera '''
         # Get a render context so we can
-        height, width = self.vision_size
+        width, height = self.vision_size
         vision = self.sim.render(width, height, camera_name='vision', mode='offscreen')
         return np.array(vision, dtype='float32') / 255
 
@@ -1144,7 +1171,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if self.observe_vision:
             obs['vision'] = self.obs_vision()
         if self.observe_topdown_img_only:
-            height, width = self.vision_size
+            width, height = self.vision_size
             obs['image'] = self.render(
                     mode='rgb_array',
                     camera_id=self.model.camera_name2id('fixedtopdown'),
@@ -1337,6 +1364,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
 
             # Terminate on constraint violation
             if self.constrain_terminate and info['cost'] > 0:
+                reward -= self.cost_constrain_term
                 self.done = True
 
         # Timeout
@@ -1468,11 +1496,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
 
         self._get_viewer(mode).update_sim(self.sim)
 
-        if camera_id is not None:
-            # Update camera if desired
-            self.viewer.cam.fixedcamid = camera_id
-            self.viewer.cam.type = const.CAMERA_FIXED
-
         # Lidar markers
         if self.render_lidar_markers:
             offset = self.render_lidar_offset_init  # Height offset for successive lidar indicators
@@ -1528,15 +1551,18 @@ class Engine(gym.Env, gym.utils.EzPickle):
             self.save_obs_vision = vision
 
         if mode == 'human':
+            if camera_id is not None:
+                self.viewer.cam.fixedcamid = camera_id
+                self.viewer.cam.type = const.CAMERA_FIXED
             self.viewer.render()
         elif mode == 'rgb_array':
-            self.viewer.render(width, height)
+            self.viewer.render(width, height, camera_id=camera_id)
             data = self.viewer.read_pixels(width, height, depth=False)
             self.viewer._markers[:] = []
             self.viewer._overlay.clear()
             return data[::-1, :, :]
         elif mode == 'depth_array':
-            self.viewer.render(width, height)
+            self.viewer.render(width, height, camera_id=camera_id)
             data = self.viewer.read_pixels(width, height, depth=True)[1]
             self.viewer._markers[:] = []
             self.viewer._overlay.clear()
