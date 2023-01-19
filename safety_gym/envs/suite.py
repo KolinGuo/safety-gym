@@ -34,12 +34,12 @@ ROBOT_OVERRIDES = {
 MAKE_VISION_ENVIRONMENTS = False
 # Make separate cost environments
 MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-img-v0
-MAKE_INDCOST_ENVIRONMENTS = True   # IndCost/Safexp-PointGoal2-img-v0
-MAKE_CONTCOST_ENVIRONMENTS = True  # ContCost/Safexp-PointGoal2-img-v0
+MAKE_COSTIND_ENVIRONMENTS = False  # CostInd/Safexp-PointGoal2-img-v0
+MAKE_COSTCONT_ENVIRONMENTS = True  # CostCont/Safexp-PointGoal2-img-v0
 COST_ENV_EXTRA_CONFIGS = {
     'CostTerm': {'constrain_terminate': True, 'cost_constrain_term': 1.0},
-    'IndCost': {'constrain_indicator': True},
-    'ContCost': {'constrain_indicator': False},
+    'CostInd': {'constrain_indicator': True},
+    'CostCont': {'constrain_indicator': False},
 }
 
 #========================================#
@@ -95,8 +95,8 @@ class SafexpEnvBase:
 
             for make, (env_ns, extra_config) in zip(
                     [MAKE_COSTTERM_ENVIRONMENTS,
-                     MAKE_INDCOST_ENVIRONMENTS,
-                     MAKE_CONTCOST_ENVIRONMENTS], COST_ENV_EXTRA_CONFIGS.items()):
+                     MAKE_COSTIND_ENVIRONMENTS,
+                     MAKE_COSTCONT_ENVIRONMENTS], COST_ENV_EXTRA_CONFIGS.items()):
                 if make:
                     env_name = f'{env_ns}/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
                     reg_config = deepcopy(base_reg_config)

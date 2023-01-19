@@ -1305,7 +1305,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         action = np.array(action, copy=False)  # Cast to ndarray
         assert not self.done, 'Environment must be reset before stepping'
 
-        info = {}
+        info = {'exception_happen': False, 'goal_met': False}
 
         # Set action
         action_range = self.model.actuator_ctrlrange
@@ -1327,7 +1327,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if exception:
             self.done = True
             reward = self.reward_exception
-            info['cost_exception'] = 1.0
+            info['exception_happen'] = True
         else:
             self.sim.forward()  # Needed to get sensor readings correct!
 
