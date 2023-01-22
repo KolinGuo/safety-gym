@@ -34,12 +34,13 @@ ROBOT_OVERRIDES = {
 MAKE_VISION_ENVIRONMENTS = False
 # Make separate cost environments
 MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-img-v0
-MAKE_COSTIND_ENVIRONMENTS = False  # CostInd/Safexp-PointGoal2-img-v0
+MAKE_COSTIND_ENVIRONMENTS = True   # CostInd/Safexp-PointGoal2-img-v0
 MAKE_COSTCONT_ENVIRONMENTS = True  # CostCont/Safexp-PointGoal2-img-v0
 COST_ENV_EXTRA_CONFIGS = {
-    'CostTerm': {'constrain_terminate': True, 'cost_constrain_term': 1.0},
-    'CostInd': {'constrain_indicator': True},
-    'CostCont': {'constrain_indicator': False},
+    'CostTerm': {'constrain_terminate': True, 'cost_constrain_term': 1.0,
+                 'constrain_indicator': True, 'ret_continuous_cost': True},
+    'CostInd': {'constrain_indicator': True, 'ret_continuous_cost': True},
+    'CostCont': {'constrain_indicator': False, 'ret_continuous_cost': True},
 }
 
 #========================================#

@@ -242,6 +242,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         'constrain_buttons': False,  # Penalize pressing incorrect buttons
         'constrain_gremlins': False,  # Moving objects that must be avoided
         'constrain_indicator': True,  # If true, all costs are either 1 or 0 for a given step.
+        'ret_continuous_cost': False,  # If true, return continuous cost with constrain_indicator in info
         'constrain_terminate': False,  # If true, terminate when any constraint is violated
         'cost_constrain_term': 1.0,  # Cost for terminate with violated constraint
 
@@ -1248,7 +1249,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         cost['cost'] = sum(v for k, v in cost.items() if k.startswith('cost_'))
 
         # Optionally remove shaping from reward functions.
-        if self.constrain_indicator:
+        if self.constrain_indicator and not self.ret_continuous_cost:
             for k in list(cost.keys()):
                 cost[k] = float(cost[k] > 0.0)  # Indicator function
 
@@ -1302,7 +1303,8 @@ class Engine(gym.Env, gym.utils.EzPickle):
         action = np.array(action, copy=False)  # Cast to ndarray
         assert not self.done, 'Environment must be reset before stepping'
 
-        info = {'exception_happen': False, 'goal_met': False}
+        info = {'exception_happen': False, 'goal_met': False,
+                'constrain_indicator': self.constrain_indicator}
 
         # Set action
         action_range = self.model.actuator_ctrlrange
