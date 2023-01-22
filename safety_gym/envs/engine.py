@@ -9,9 +9,6 @@ from collections import OrderedDict
 import mujoco_py
 from mujoco_py import MjViewer, MujocoException, const, MjRenderContextOffscreen
 
-# https://github.com/openai/mujoco-py/issues/390#issuecomment-525385434
-mujoco_py.GlfwContext(offscreen=True, quiet=True)  # Create a window to init GLFW
-
 from safety_gym.envs.world import World, Robot
 
 import sys
