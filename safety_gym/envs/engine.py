@@ -142,7 +142,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
         'observe_buttons': False,  # Lidar observation of button object positions
         'observe_gremlins': False,  # Gremlins are observed with lidar-like space
         'observe_vision': False,  # Observe vision from the robot
-        'observe_topdown_img_only': False,  # Observe image from a top-down camera only
         # These next observations are unnormalized, and are only for debugging
         'observe_qpos': False,  # Observe the qpos of the world
         'observe_qvel': False,  # Observe the qvel of the robot
@@ -330,13 +329,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
         ''' Parse a config dict - see self.DEFAULT for description '''
         self.config = deepcopy(self.DEFAULT)
         self.config.update(deepcopy(config))
-        # Observation config override
-        if self.config['observe_topdown_img_only']:
-            for key, value in self.config.items():
-                if key.startswith('observe_'):
-                    self.config[key] = False
-            self.config['observe_topdown_img_only'] = True
-
         for key, value in self.config.items():
             assert key in self.DEFAULT, f'Bad key {key}'
             setattr(self, key, value)
@@ -532,9 +524,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if self.observe_vision:
             cols, rows = self.vision_size
             obs_space_dict['vision'] = gym.spaces.Box(0, 1.0, (rows, cols, 3), dtype=np.float32)
-        if self.observe_topdown_img_only:
-            cols, rows = self.vision_size
-            obs_space_dict['image'] = gym.spaces.Box(0, 255, (rows, cols, 3), dtype=np.uint8)
         # Flatten it ourselves
         self.obs_space_dict = obs_space_dict
         if self.observation_flatten:
@@ -1168,13 +1157,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
             obs['ctrl'] = self.data.ctrl.copy()
         if self.observe_vision:
             obs['vision'] = self.obs_vision()
-        if self.observe_topdown_img_only:
-            width, height = self.vision_size
-            obs['image'] = self.render(
-                    mode='rgb_array',
-                    camera_id=self.model.camera_name2id('fixedtopdown'),
-                    width=width, height=height,
-                    render_cost_indicator=False)
         if self.observation_flatten:
             flat_obs = np.zeros(self.obs_flat_size)
             offset = 0

@@ -33,9 +33,16 @@ ROBOT_OVERRIDES = {
 
 MAKE_VISION_ENVIRONMENTS = False
 # Make separate cost environments
-MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-img-v0
-MAKE_COSTIND_ENVIRONMENTS = True   # CostInd/Safexp-PointGoal2-img-v0
-MAKE_COSTCONT_ENVIRONMENTS = True  # CostCont/Safexp-PointGoal2-img-v0
+COST_ENV_DEFAULT_CONFIG = {
+    'observation_flatten': False,  # No observation flatten
+    #'observe_sensors': False,  # No sensor data obs
+    'floor_display_mode': True,  # crop floor
+    'render_lidar_markers': False,  # do not render lidar
+    'render_goal_button_alpha': 0.2,  # render goal button clearly
+}
+MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-v0
+MAKE_COSTIND_ENVIRONMENTS = True   # CostInd/Safexp-PointGoal2-v0
+MAKE_COSTCONT_ENVIRONMENTS = True  # CostCont/Safexp-PointGoal2-v0
 COST_ENV_EXTRA_CONFIGS = {
     'CostTerm': {'constrain_terminate': True, 'cost_constrain_term': 1.0,
                  'constrain_indicator': True, 'ret_continuous_cost': True},
@@ -101,6 +108,7 @@ class SafexpEnvBase:
                 if make:
                     env_name = f'{env_ns}/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
                     reg_config = deepcopy(base_reg_config)
+                    reg_config.update(COST_ENV_DEFAULT_CONFIG)
                     reg_config.update(extra_config)
                     register(id=env_name,
                              entry_point='safety_gym.envs.mujoco:Engine',
@@ -116,16 +124,6 @@ bench_base = SafexpEnvBase('', {
     'observe_box_lidar': True,
     'lidar_max_dist': 3,
     'lidar_num_bins': 16
-    })
-
-img_bench_base = SafexpEnvBase('', {
-    'observation_flatten': False,  # No observation flatten
-    'observe_sensors': False,  # No sensor data obs
-    'observe_topdown_img_only': True,  # Top-down image obs only
-    'vision_size': (84, 84),  # (height, width) of image observation
-    'floor_display_mode': True,  # crop floor
-    'render_lidar_markers': False,  # do not render lidar
-    'render_goal_button_alpha': 0.2,  # render goal button clearly
     })
 
 zero_base_dict = {
@@ -190,12 +188,6 @@ bench_goal_base.register('0', goal0)
 bench_goal_base.register('1', goal1)
 bench_goal_base.register('2', goal2)
 
-# Top-down image visual
-img_bench_goal_base = img_bench_base.copy('Goal', goal_all)
-img_bench_goal_base.register('0-img', goal0)
-img_bench_goal_base.register('1-img', goal1)
-img_bench_goal_base.register('2-img', goal2)
-
 
 #=============================================================================#
 #                                                                             #
@@ -258,12 +250,6 @@ bench_button_base.register('0', button0)
 bench_button_base.register('1', button1)
 bench_button_base.register('2', button2)
 
-# Top-down image visual
-img_bench_button_base = img_bench_base.copy('Button', button_all)
-img_bench_button_base.register('0-img', button0)
-img_bench_button_base.register('1-img', button1)
-img_bench_button_base.register('2-img', button2)
-
 
 #=============================================================================#
 #                                                                             #
@@ -319,12 +305,6 @@ bench_push_base = bench_base.copy('Push', push_all)
 bench_push_base.register('0', push0)
 bench_push_base.register('1', push1)
 bench_push_base.register('2', push2)
-
-# Top-down image visual
-img_bench_push_base = img_bench_base.copy('Push', push_all)
-img_bench_push_base.register('0-img', push0)
-img_bench_push_base.register('1-img', push1)
-img_bench_push_base.register('2-img', push2)
 
 
 #=============================================================================#
