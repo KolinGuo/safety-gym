@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 from copy import deepcopy
 from collections import OrderedDict
+from scipy.spatial.transform import Rotation as R  # For debugging with GT state info
 import mujoco_py
 from mujoco_py import MjViewer, MujocoException, const, MjRenderContextOffscreen
 
@@ -127,12 +128,16 @@ class Engine(gym.Env, gym.utils.EzPickle):
         # Observation flags - some of these require other flags to be on
         # By default, only robot sensor observations are enabled.
         'observation_flatten': True,  # Flatten observation into a vector
+        'observe_robot_xytheta': False,  # Observe robot xy theta
         'observe_sensors': True,  # Observe all sensor data from simulator
+        'observe_goal_pos': False,  # Observe goal xy position
         'observe_goal_dist': False,  # Observe the distance to the goal
         'observe_goal_comp': False,  # Observe a compass vector to the goal
         'observe_goal_lidar': False,  # Observe the goal with a lidar sensor
+        'observe_box_pos': False,  # Observe box xy position
         'observe_box_comp': False,  # Observe the box with a compass
         'observe_box_lidar': False,  # Observe the box with a lidar
+        'observe_body_pos_comp': False,  # Observe all body xy positions + compasses
         'observe_circle': False,  # Observe the origin with a lidar
         'observe_remaining': False,  # Observe the fraction of steps remaining
         'observe_walls': False,  # Observe the walls with a lidar space
@@ -449,6 +454,8 @@ class Engine(gym.Env, gym.utils.EzPickle):
             obs_space_dict['freejoint'] = gym.spaces.Box(-np.inf, np.inf, (7,), dtype=np.float32)
         if self.observe_com:
             obs_space_dict['com'] = gym.spaces.Box(-np.inf, np.inf, (3,), dtype=np.float32)
+        if self.observe_robot_xytheta:
+            obs_space_dict['robot_xytheta'] = gym.spaces.Box(-np.inf, np.inf, (3,), dtype=np.float32)
         if self.observe_sensors:
             for sensor in self.sensors_obs:  # Explicitly listed sensors
                 dim = self.robot.sensor_dim[sensor]
@@ -489,10 +496,14 @@ class Engine(gym.Env, gym.utils.EzPickle):
                 for sensor in self.robot.ballquat_names:
                     obs_space_dict[sensor] = gym.spaces.Box(-np.inf, np.inf, (4,), dtype=np.float32)
         if self.task == 'push':
+            if self.observe_box_pos:
+                obs_space_dict['box_pos'] = gym.spaces.Box(-np.inf, np.inf, (2,), dtype=np.float32)
             if self.observe_box_comp:
                 obs_space_dict['box_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape,), dtype=np.float32)
             if self.observe_box_lidar:
                 obs_space_dict['box_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+        if self.observe_goal_pos:
+            obs_space_dict['goal_pos'] = gym.spaces.Box(-np.inf, np.inf, (2,), dtype=np.float32)
         if self.observe_goal_dist:
             obs_space_dict['goal_dist'] = gym.spaces.Box(0.0, 1.0, (1,), dtype=np.float32)
         if self.observe_goal_comp:
@@ -506,15 +517,35 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if self.walls_num and self.observe_walls:
             obs_space_dict['walls_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
         if self.observe_hazards:
-            obs_space_dict['hazards_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+            if self.observe_body_pos_comp:
+                obs_space_dict['hazards_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.hazards_num,), dtype=np.float32)
+                obs_space_dict['hazards_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.hazards_num,), dtype=np.float32)
+            else:
+                obs_space_dict['hazards_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
         if self.observe_vases:
-            obs_space_dict['vases_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+            if self.observe_body_pos_comp:
+                obs_space_dict['vases_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.vases_num,), dtype=np.float32)
+                obs_space_dict['vases_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.vases_num,), dtype=np.float32)
+            else:
+                obs_space_dict['vases_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
         if self.gremlins_num and self.observe_gremlins:
-            obs_space_dict['gremlins_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+            if self.observe_body_pos_comp:
+                obs_space_dict['gremlins_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.gremlins_num,), dtype=np.float32)
+                obs_space_dict['gremlins_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.gremlins_num,), dtype=np.float32)
+            else:
+                obs_space_dict['gremlins_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
         if self.pillars_num and self.observe_pillars:
-            obs_space_dict['pillars_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+            if self.observe_body_pos_comp:
+                obs_space_dict['pillars_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.pillars_num,), dtype=np.float32)
+                obs_space_dict['pillars_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.pillars_num,), dtype=np.float32)
+            else:
+                obs_space_dict['pillars_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
         if self.buttons_num and self.observe_buttons:
-            obs_space_dict['buttons_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+            if self.observe_body_pos_comp:
+                obs_space_dict['buttons_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.buttons_num,), dtype=np.float32)
+                obs_space_dict['buttons_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.buttons_num,), dtype=np.float32)
+            else:
+                obs_space_dict['buttons_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
         if self.observe_qpos:
             obs_space_dict['qpos'] = gym.spaces.Box(-np.inf, np.inf, (self.robot.nq,), dtype=np.float32)
         if self.observe_qvel:
@@ -1088,6 +1119,8 @@ class Engine(gym.Env, gym.utils.EzPickle):
         self.sim.forward()  # Needed to get sensordata correct
         obs = {}
 
+        if self.observe_goal_pos:
+            obs['goal_pos'] = self.goal_pos[:2]
         if self.observe_goal_dist:
             obs['goal_dist'] = np.array([np.exp(-self.dist_goal())])
         if self.observe_goal_comp:
@@ -1096,6 +1129,8 @@ class Engine(gym.Env, gym.utils.EzPickle):
             obs['goal_lidar'] = self.obs_lidar([self.goal_pos], GROUP_GOAL)
         if self.task == 'push':
             box_pos = self.box_pos
+            if self.observe_box_pos:
+                obs['box_pos'] = box_pos[:2]
             if self.observe_box_comp:
                 obs['box_compass'] = self.obs_compass(box_pos)
             if self.observe_box_lidar:
@@ -1109,6 +1144,11 @@ class Engine(gym.Env, gym.utils.EzPickle):
             obs['freejoint'] = self.data.qpos[:7]
         if self.observe_com:
             obs['com'] = self.world.robot_com()
+        if self.observe_robot_xytheta:
+            obs['robot_xytheta'] = np.hstack([
+                    self.world.robot_pos()[:2],
+                    R.from_matrix(self.world.robot_mat()).as_euler('xyz', degrees=False)[-1]
+            ])
         if self.observe_sensors:
             # Sensors which can be read directly, without processing
             for sensor in self.sensors_obs:  # Explicitly listed sensors
@@ -1136,19 +1176,43 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if self.walls_num and self.observe_walls:
             obs['walls_lidar'] = self.obs_lidar(self.walls_pos, GROUP_WALL)
         if self.observe_hazards:
-            obs['hazards_lidar'] = self.obs_lidar(self.hazards_pos, GROUP_HAZARD)
+            if self.observe_body_pos_comp:
+                obs['hazards_pos'] = np.stack(self.hazards_pos)[:, :2].flatten()
+                obs['hazards_compass'] = np.hstack([self.obs_compass(p) for p in self.hazards_pos])
+            else:
+                obs['hazards_lidar'] = self.obs_lidar(self.hazards_pos, GROUP_HAZARD)
         if self.observe_vases:
-            obs['vases_lidar'] = self.obs_lidar(self.vases_pos, GROUP_VASE)
+            if self.observe_body_pos_comp:
+                obs['vases_pos'] = np.stack(self.vases_pos)[:, :2].flatten()
+                obs['vases_compass'] = np.hstack([self.obs_compass(p) for p in self.vases_pos])
+            else:
+                obs['vases_lidar'] = self.obs_lidar(self.vases_pos, GROUP_VASE)
         if self.gremlins_num and self.observe_gremlins:
-            obs['gremlins_lidar'] = self.obs_lidar(self.gremlins_obj_pos, GROUP_GREMLIN)
+            if self.observe_body_pos_comp:
+                obs['gremlins_pos'] = np.stack(self.gremlins_obj_pos)[:, :2].flatten()
+                obs['gremlins_compass'] = np.hstack([self.obs_compass(p) for p in self.gremlins_obj_pos])
+            else:
+                obs['gremlins_lidar'] = self.obs_lidar(self.gremlins_obj_pos, GROUP_GREMLIN)
         if self.pillars_num and self.observe_pillars:
-            obs['pillars_lidar'] = self.obs_lidar(self.pillars_pos, GROUP_PILLAR)
+            if self.observe_body_pos_comp:
+                obs['pillars_pos'] = np.stack(self.pillars_pos)[:, :2].flatten()
+                obs['pillars_compass'] = np.hstack([self.obs_compass(p) for p in self.pillars_pos])
+            else:
+                obs['pillars_lidar'] = self.obs_lidar(self.pillars_pos, GROUP_PILLAR)
         if self.buttons_num and self.observe_buttons:
             # Buttons observation is zero while buttons are resetting
             if self.buttons_timer == 0:
-                obs['buttons_lidar'] = self.obs_lidar(self.buttons_pos, GROUP_BUTTON)
+                if self.observe_body_pos_comp:
+                    obs['buttons_pos'] = np.stack(self.buttons_pos)[:, :2].flatten()
+                    obs['buttons_compass'] = np.hstack([self.obs_compass(p) for p in self.buttons_pos])
+                else:
+                    obs['buttons_lidar'] = self.obs_lidar(self.buttons_pos, GROUP_BUTTON)
             else:
-                obs['buttons_lidar'] = np.zeros(self.lidar_num_bins)
+                if self.observe_body_pos_comp:
+                    obs['buttons_pos'] = np.zeros(2*self.buttons_num)
+                    obs['buttons_compass'] = np.zeros(self.compass_shape*self.buttons_num)
+                else:
+                    obs['buttons_lidar'] = np.zeros(self.lidar_num_bins)
         if self.observe_qpos:
             obs['qpos'] = self.data.qpos.copy()
         if self.observe_qvel:

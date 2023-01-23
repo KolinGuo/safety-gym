@@ -40,9 +40,23 @@ COST_ENV_DEFAULT_CONFIG = {
     'render_lidar_markers': False,  # do not render lidar
     'render_goal_button_alpha': 0.2,  # render goal button clearly
 }
+# Debug environment with robot xytheta, robot sensors, all body xy pos + compasses
+COST_DEBUG_ENV_DEFAULT_CONFIG = {
+    'observation_flatten': True,  # No observation flatten
+    'observe_robot_xytheta': True,  # With robot xytheta
+    'observe_sensors': True,  # With sensor data obs
+    'observe_goal_pos': True,  # With goal xy position
+    'observe_goal_comp': True,  # With goal compass
+    'observe_goal_lidar': False,  # No goal lidar
+    'observe_box_pos': True,  # With box xy position
+    'observe_box_comp': True,  # With box compass
+    'observe_box_lidar': False,  # No box lidar
+    'observe_body_pos_comp': True,  # With all body xy positions + compasses
+}
 MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-v0
 MAKE_COSTIND_ENVIRONMENTS = True   # CostInd/Safexp-PointGoal2-v0
 MAKE_COSTCONT_ENVIRONMENTS = True  # CostCont/Safexp-PointGoal2-v0
+MAKE_COST_DEBUG_ENVIRONMENTS = True  # Cost*State/Safexp-PointGoal2-v0
 COST_ENV_EXTRA_CONFIGS = {
     'CostTerm': {'constrain_terminate': True, 'cost_constrain_term': 1.0,
                  'constrain_indicator': True, 'ret_continuous_cost': True},
@@ -113,6 +127,13 @@ class SafexpEnvBase:
                     register(id=env_name,
                              entry_point='safety_gym.envs.mujoco:Engine',
                              kwargs={'config': reg_config})
+                    if MAKE_COST_DEBUG_ENVIRONMENTS:
+                        env_name = f'{env_ns}State/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
+                        reg_config = deepcopy(reg_config)
+                        reg_config.update(COST_DEBUG_ENV_DEFAULT_CONFIG)
+                        register(id=env_name,
+                                 entry_point='safety_gym.envs.mujoco:Engine',
+                                 kwargs={'config': reg_config})
 
 
 #=======================================#
