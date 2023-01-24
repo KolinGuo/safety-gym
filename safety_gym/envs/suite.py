@@ -40,7 +40,17 @@ COST_ENV_DEFAULT_CONFIG = {
     'render_lidar_markers': False,  # do not render lidar
     'render_goal_button_alpha': 0.2,  # render goal button clearly
 }
+MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-v0
+MAKE_COSTIND_ENVIRONMENTS = True   # CostInd/Safexp-PointGoal2-v0
+MAKE_COSTCONT_ENVIRONMENTS = True  # CostCont/Safexp-PointGoal2-v0
+COST_ENV_EXTRA_CONFIGS = {
+    'CostTerm': {'constrain_terminate': True, 'cost_constrain_term': 1.0,
+                 'constrain_indicator': True, 'ret_continuous_cost': True},
+    'CostInd': {'constrain_indicator': True, 'ret_continuous_cost': True},
+    'CostCont': {'constrain_indicator': False, 'ret_continuous_cost': True},
+}
 # Debug environment with robot xytheta, robot sensors, all body xy pos + compasses
+MAKE_COST_DEBUG_ENVIRONMENTS = True  # Cost*State/Safexp-PointGoal2-v0
 COST_DEBUG_ENV_DEFAULT_CONFIG = {
     'observation_flatten': True,  # No observation flatten
     'observe_robot_xytheta': True,  # With robot xytheta
@@ -53,15 +63,9 @@ COST_DEBUG_ENV_DEFAULT_CONFIG = {
     'observe_box_lidar': False,  # No box lidar
     'observe_body_pos_comp': True,  # With all body xy positions + compasses
 }
-MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-v0
-MAKE_COSTIND_ENVIRONMENTS = True   # CostInd/Safexp-PointGoal2-v0
-MAKE_COSTCONT_ENVIRONMENTS = True  # CostCont/Safexp-PointGoal2-v0
-MAKE_COST_DEBUG_ENVIRONMENTS = True  # Cost*State/Safexp-PointGoal2-v0
-COST_ENV_EXTRA_CONFIGS = {
-    'CostTerm': {'constrain_terminate': True, 'cost_constrain_term': 1.0,
-                 'constrain_indicator': True, 'ret_continuous_cost': True},
-    'CostInd': {'constrain_indicator': True, 'ret_continuous_cost': True},
-    'CostCont': {'constrain_indicator': False, 'ret_continuous_cost': True},
+MAKE_DETERMINISTIC_DEBUG_ENVIRONMENTS = True  # Cost*NoRand/Safexp-PointGoal2-v0
+DETERM_LAYOUT_DEFAULT_CONFIG = {
+    'randomize_layout': False,  # Deterministic layout
 }
 
 #========================================#
@@ -90,6 +94,39 @@ class SafexpEnvBase:
         new_config.update(config)
         return SafexpEnvBase(self.name + name, new_config)
 
+    def register_determ_layout_envs(self, env_ns, name, robot_name, reg_config):
+        """Register *NoRand/Safexp-*-v0 environments"""
+        if MAKE_DETERMINISTIC_DEBUG_ENVIRONMENTS:
+            env_name = f'{env_ns}NoRand/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
+            reg_config.update(DETERM_LAYOUT_DEFAULT_CONFIG)
+            register(id=env_name,
+                     entry_point='safety_gym.envs.mujoco:Engine',
+                     kwargs={'config': reg_config})
+
+    def register_cost_envs(self, name, robot_name, base_reg_config):
+        """Register Cost*/Safexp-*-v0 environments"""
+        for make, (env_ns, extra_config) in zip(
+                [MAKE_COSTTERM_ENVIRONMENTS,
+                 MAKE_COSTIND_ENVIRONMENTS,
+                 MAKE_COSTCONT_ENVIRONMENTS], COST_ENV_EXTRA_CONFIGS.items()):
+            if make:
+                env_name = f'{env_ns}/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
+                reg_config = base_reg_config
+                reg_config.update(COST_ENV_DEFAULT_CONFIG)
+                reg_config.update(extra_config)
+                register(id=env_name,
+                         entry_point='safety_gym.envs.mujoco:Engine',
+                         kwargs={'config': reg_config})
+                self.register_determ_layout_envs(env_ns, name, robot_name, deepcopy(reg_config))
+                if MAKE_COST_DEBUG_ENVIRONMENTS:
+                    env_name = f'{env_ns}State/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
+                    reg_config = deepcopy(reg_config)
+                    reg_config.update(COST_DEBUG_ENV_DEFAULT_CONFIG)
+                    register(id=env_name,
+                             entry_point='safety_gym.envs.mujoco:Engine',
+                             kwargs={'config': reg_config})
+                    self.register_determ_layout_envs(env_ns+'State', name, robot_name, deepcopy(reg_config))
+
     def register(self, name='', config={}):
         # Note: see safety_gym/envs/mujoco.py for an explanation why we're using
         # 'safety_gym.envs.mujoco:Engine' as the entrypoint, instead of
@@ -115,25 +152,7 @@ class SafexpEnvBase:
                          entry_point='safety_gym.envs.mujoco:Engine',
                          kwargs={'config': reg_config})
 
-            for make, (env_ns, extra_config) in zip(
-                    [MAKE_COSTTERM_ENVIRONMENTS,
-                     MAKE_COSTIND_ENVIRONMENTS,
-                     MAKE_COSTCONT_ENVIRONMENTS], COST_ENV_EXTRA_CONFIGS.items()):
-                if make:
-                    env_name = f'{env_ns}/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
-                    reg_config = deepcopy(base_reg_config)
-                    reg_config.update(COST_ENV_DEFAULT_CONFIG)
-                    reg_config.update(extra_config)
-                    register(id=env_name,
-                             entry_point='safety_gym.envs.mujoco:Engine',
-                             kwargs={'config': reg_config})
-                    if MAKE_COST_DEBUG_ENVIRONMENTS:
-                        env_name = f'{env_ns}State/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
-                        reg_config = deepcopy(reg_config)
-                        reg_config.update(COST_DEBUG_ENV_DEFAULT_CONFIG)
-                        register(id=env_name,
-                                 entry_point='safety_gym.envs.mujoco:Engine',
-                                 kwargs={'config': reg_config})
+            self.register_cost_envs(name, robot_name, deepcopy(base_reg_config))
 
 
 #=======================================#
