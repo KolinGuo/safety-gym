@@ -111,7 +111,7 @@ class SafexpEnvBase:
                  MAKE_COSTCONT_ENVIRONMENTS], COST_ENV_EXTRA_CONFIGS.items()):
             if make:
                 env_name = f'{env_ns}/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
-                reg_config = base_reg_config
+                reg_config = deepcopy(base_reg_config)
                 reg_config.update(COST_ENV_DEFAULT_CONFIG)
                 reg_config.update(extra_config)
                 register(id=env_name,
@@ -152,7 +152,7 @@ class SafexpEnvBase:
                          entry_point='safety_gym.envs.mujoco:Engine',
                          kwargs={'config': reg_config})
 
-            self.register_cost_envs(name, robot_name, deepcopy(base_reg_config))
+            self.register_cost_envs(name, robot_name, base_reg_config)
 
 
 #=======================================#
