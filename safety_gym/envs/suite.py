@@ -35,10 +35,19 @@ MAKE_VISION_ENVIRONMENTS = False
 # Make separate cost environments
 COST_ENV_DEFAULT_CONFIG = {
     'observation_flatten': False,  # No observation flatten
-    #'observe_sensors': False,  # No sensor data obs
     'floor_display_mode': True,  # crop floor
     'render_lidar_markers': False,  # do not render lidar
     'render_goal_button_alpha': 0.2,  # render goal button clearly
+    # State obs
+    'observe_robot_xytheta': True,  # With robot xytheta
+    'observe_sensors': True,  # With sensor data obs
+    'observe_goal_pos': True,  # With goal xy position
+    'observe_goal_comp': True,  # With goal compass
+    'observe_goal_lidar': False,  # No goal lidar
+    'observe_box_pos': True,  # With box xy position
+    'observe_box_comp': True,  # With box compass
+    'observe_box_lidar': False,  # No box lidar
+    'observe_body_pos_comp': True,  # With all body xy positions + compasses
 }
 MAKE_COSTTERM_ENVIRONMENTS = True  # CostTerm/Safexp-PointGoal2-v0
 MAKE_COSTIND_ENVIRONMENTS = True   # CostInd/Safexp-PointGoal2-v0
@@ -50,18 +59,9 @@ COST_ENV_EXTRA_CONFIGS = {
     'CostCont': {'constrain_indicator': False, 'ret_continuous_cost': True},
 }
 # Debug environment with robot xytheta, robot sensors, all body xy pos + compasses
-MAKE_COST_DEBUG_ENVIRONMENTS = True  # Cost*State/Safexp-PointGoal2-v0
-COST_DEBUG_ENV_DEFAULT_CONFIG = {
-    'observation_flatten': True,  # No observation flatten
-    'observe_robot_xytheta': True,  # With robot xytheta
-    'observe_sensors': True,  # With sensor data obs
-    'observe_goal_pos': True,  # With goal xy position
-    'observe_goal_comp': True,  # With goal compass
-    'observe_goal_lidar': False,  # No goal lidar
-    'observe_box_pos': True,  # With box xy position
-    'observe_box_comp': True,  # With box compass
-    'observe_box_lidar': False,  # No box lidar
-    'observe_body_pos_comp': True,  # With all body xy positions + compasses
+MAKE_STATE_DEBUG_ENVIRONMENTS = True  # Cost*State/Safexp-PointGoal2-v0
+STATE_DEBUG_ENV_DEFAULT_CONFIG = {
+    'observation_flatten': True,  # observation flatten
 }
 MAKE_DETERMINISTIC_DEBUG_ENVIRONMENTS = True  # Cost*NoRand/Safexp-PointGoal2-v0
 DETERM_LAYOUT_DEFAULT_CONFIG = {
@@ -118,10 +118,10 @@ class SafexpEnvBase:
                          entry_point='safety_gym.envs.mujoco:Engine',
                          kwargs={'config': reg_config})
                 self.register_determ_layout_envs(env_ns, name, robot_name, deepcopy(reg_config))
-                if MAKE_COST_DEBUG_ENVIRONMENTS:
+                if MAKE_STATE_DEBUG_ENVIRONMENTS:
                     env_name = f'{env_ns}State/{self.prefix}-{robot_name}{self.name + name}-{VERSION}'
                     reg_config = deepcopy(reg_config)
-                    reg_config.update(COST_DEBUG_ENV_DEFAULT_CONFIG)
+                    reg_config.update(STATE_DEBUG_ENV_DEFAULT_CONFIG)
                     register(id=env_name,
                              entry_point='safety_gym.envs.mujoco:Engine',
                              kwargs={'config': reg_config})
