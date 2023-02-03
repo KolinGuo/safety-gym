@@ -1523,6 +1523,25 @@ class Engine(gym.Env, gym.utils.EzPickle):
                                rgba=np.array(color) * alpha,
                                label=label if self.render_labels else '')
 
+    def render_robot_heading(self, size=[0.05, 0.05, 3], rgba=[0, 1, 0, 0.3]):
+        """Render an arrow for robot heading"""
+        robot_pos = self.world.robot_pos()
+        robot_mat = self.world.robot_mat()  # R_world_robot
+
+        if self.config['robot_base'] == 'xmls/car.xml':
+            R_robot_heading = R.from_euler('x', 90, degrees=True).as_matrix()
+        else:
+            R_robot_heading = R.from_euler('y', 90, degrees=True).as_matrix()
+
+        self.viewer.add_marker(
+            pos=robot_pos,
+            size=size,
+            rgba=rgba,
+            type=const.GEOM_ARROW,
+            mat=robot_mat @ R_robot_heading,
+            label='',
+        )
+
     def render_swap_callback(self):
         ''' Callback between mujoco render and swapping GL buffers '''
         if self.observe_vision and self.vision_render:
@@ -1586,6 +1605,10 @@ class Engine(gym.Env, gym.utils.EzPickle):
         # Add indicator for nonzero cost
         if kwargs.get('render_cost_indicator', True) and self._cost.get('cost', 0) > 0:
             self.render_sphere(self.world.robot_pos(), 0.25, COLOR_RED, alpha=.5)
+
+        # Add indicator for nonzero cost
+        if kwargs.get('render_robot_heading', False):
+            self.render_robot_heading()
 
         # Draw vision pixels
         if self.observe_vision and self.vision_render:
