@@ -1533,6 +1533,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         else:
             R_robot_heading = R.from_euler('y', 90, degrees=True).as_matrix()
 
+        # Available kwargs: https://mujoco.readthedocs.io/en/stable/APIreference.html#mjvgeom
         self.viewer.add_marker(
             pos=robot_pos,
             size=size,
