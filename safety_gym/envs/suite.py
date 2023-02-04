@@ -8,7 +8,7 @@ import numpy as np
 
 VERSION = 'v0'
 
-ROBOT_NAMES = ('Point', 'Car', 'Doggo')
+ROBOT_NAMES = ('Point', 'PointXY', 'Car', 'Doggo')
 ROBOT_XMLS = {name: f'xmls/{name.lower()}.xml' for name in ROBOT_NAMES}
 BASE_SENSORS = ['accelerometer', 'velocimeter', 'gyro', 'magnetometer']
 EXTRA_SENSORS = {
@@ -24,6 +24,9 @@ EXTRA_SENSORS = {
         ],
 }
 ROBOT_OVERRIDES = {
+    'PointXY': {
+        'robot_rot': 0.0,  # Override robot starting angle
+        },
     'Car': {
         'box_size': 0.125,  # Box half-radius size
         'box_keepout': 0.125,  # Box keepout radius for placement
