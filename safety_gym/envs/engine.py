@@ -162,6 +162,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         'render_lidar_offset_init': 0.5,
         'render_lidar_offset_delta': 0.06,
         'render_goal_button_alpha': 0.1,  # Transparency of rendering goal button
+        'render_heading_color': [1, 0.5, 0, 0.3],  # rgba of rendered heading
 
         # Vision observation parameters
         'vision_size': (60, 40),  # Size (width, height) of vision observation; gets flipped internally to (rows, cols) format
@@ -1523,7 +1524,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
                                rgba=np.array(color) * alpha,
                                label=label if self.render_labels else '')
 
-    def render_robot_heading(self, size=[0.05, 0.05, 3], rgba=[0, 1, 0, 0.3]):
+    def render_robot_heading(self, size=[0.10, 0.10, 3], rgba=[0, 1, 0, 0.3]):
         """Render an arrow for robot heading"""
         robot_pos = self.world.robot_pos()
         robot_mat = self.world.robot_mat()  # R_world_robot
@@ -1600,7 +1601,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
 
         # Add goal marker
         if self.task == 'button':
-            self.render_area(self.goal_pos, self.buttons_size * 2, COLOR_BUTTON,
+            self.render_area(self.goal_pos, self.buttons_size * 2, COLOR_GOAL,
                              'goal', alpha=self.render_goal_button_alpha)
 
         # Add indicator for nonzero cost
@@ -1609,7 +1610,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
 
         # Add indicator for nonzero cost
         if kwargs.get('render_robot_heading', False):
-            self.render_robot_heading()
+            self.render_robot_heading(rgba=self.render_heading_color)
 
         # Draw vision pixels
         if self.observe_vision and self.vision_render:

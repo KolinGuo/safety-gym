@@ -188,6 +188,7 @@ goal_all = {
     'goal_keepout': 0.305,
     'hazards_size': 0.2,
     'hazards_keepout': 0.18,
+    'render_heading_color': [1, 0.5, 0, 0.3],  # rgba of rendered heading
     }
 
 # Shared among constrained envs (levels 1, 2)
@@ -249,6 +250,7 @@ button_all = {
     'hazards_keepout': 0.18,
     'gremlins_travel': 0.35,
     'gremlins_keepout': 0.4,
+    'render_heading_color': [0, 1, 1, 0.3],  # rgba of rendered heading
     }
 
 # Shared among constrained envs (levels 1, 2)
@@ -306,6 +308,7 @@ push_all = {
     'box_size': 0.2,
     'box_null_dist': 0,
     'hazards_size': 0.3,
+    'render_heading_color': [1, 0.5, 0, 0.3],  # rgba of rendered heading
     }
 
 # Shared among constrained envs (levels 1, 2)
