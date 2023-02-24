@@ -331,6 +331,30 @@ class Engine(gym.Env, gym.utils.EzPickle):
         self.seed(self._seed)
         self.done = True
 
+        # Number of constraints
+        #    hazards  : 1, not within
+        #    vases    : 2, no contact + zero velocity
+        #    buttons  : 1, no contact
+        #    pillars  : 1, no contact
+        #    gremlins : 1, no contact
+        active_constraints = []
+        if self.constrain_hazards:
+            active_constraints += ['cost_hazards']
+        if self.constrain_vases:
+            active_constraints += ['cost_vases_contact']
+        if self.constrain_vases and self.vases_displace_cost:
+            active_constraints += ['cost_vases_displace']
+        if self.constrain_vases and self.vases_velocity_cost:
+            active_constraints += ['cost_vases_velocity']
+        if self.constrain_pillars:
+            active_constraints += ['cost_pillars']
+        if self.constrain_buttons:
+            active_constraints += ['cost_buttons']
+        if self.constrain_gremlins:
+            active_constraints += ['cost_gremlins']
+        self.active_constraints = active_constraints
+
+
     def parse(self, config):
         ''' Parse a config dict - see self.DEFAULT for description '''
         self.config = deepcopy(self.DEFAULT)
@@ -365,29 +389,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
         metadata = {
             'render_modes': ['human', 'rgb_array', 'depth_array'],
         }
-
-        # Number of constraints
-        #    hazards  : 1, not within
-        #    vases    : 2, no contact + zero velocity
-        #    buttons  : 1, no contact
-        #    pillars  : 1, no contact
-        #    gremlins : 1, no contact
-        active_constraints = []
-        if self.constrain_hazards:
-            active_constraints += ['cost_hazards']
-        if self.constrain_vases:
-            active_constraints += ['cost_vases_contact']
-        if self.constrain_vases and self.vases_displace_cost:
-            active_constraints += ['cost_vases_displace']
-        if self.constrain_vases and self.vases_velocity_cost:
-            active_constraints += ['cost_vases_velocity']
-        if self.constrain_pillars:
-            active_constraints += ['cost_pillars']
-        if self.constrain_buttons:
-            active_constraints += ['cost_buttons']
-        if self.constrain_gremlins:
-            active_constraints += ['cost_gremlins']
-        metadata['active_constraints'] = active_constraints
 
         if np.isclose(self.frameskip_binom_p, 1.0):
             metadata['video.frames_per_second']: int(np.round(1.0 / self.dt))
@@ -1233,20 +1234,11 @@ class Engine(gym.Env, gym.utils.EzPickle):
         assert self.observation_space.contains(obs), f'Bad obs {obs} {self.observation_space}'
         return obs
 
-
     def cost(self):
         ''' Calculate the current costs and return a dict '''
         self.sim.forward()  # Ensure positions and contacts are correct
-        cost = {}
-        # Conctacts processing
-        if self.constrain_vases:
-            cost['cost_vases_contact'] = 0
-        if self.constrain_pillars:
-            cost['cost_pillars'] = 0
-        if self.constrain_buttons:
-            cost['cost_buttons'] = 0
-        if self.constrain_gremlins:
-            cost['cost_gremlins'] = 0
+        cost = {k: 0.0 for k in self.active_constraints}
+        # Contacts processing
         buttons_constraints_active = self.constrain_buttons and (self.buttons_timer == 0)
         for contact in self.data.contact[:self.data.ncon]:
             geom_ids = [contact.geom1, contact.geom2]
@@ -1267,7 +1259,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
 
         # Displacement processing
         if self.constrain_vases and self.vases_displace_cost:
-            cost['cost_vases_displace'] = 0
             for i in range(self.vases_num):
                 name = f'vase{i}'
                 dist = np.sqrt(np.sum(np.square(self.data.get_body_xpos(name)[:2] - self.reset_layout[name])))
@@ -1277,7 +1268,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
         # Velocity processing
         if self.constrain_vases and self.vases_velocity_cost:
             # TODO: penalize rotational velocity too, but requires another cost coefficient
-            cost['cost_vases_velocity'] = 0
             for i in range(self.vases_num):
                 name = f'vase{i}'
                 vel = np.sqrt(np.sum(np.square(self.data.get_body_xvelp(name))))
@@ -1286,7 +1276,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
 
         # Calculate constraint violations
         if self.constrain_hazards:
-            cost['cost_hazards'] = 0
             for h_pos in self.hazards_pos:
                 h_dist = self.dist_xy(h_pos)
                 if h_dist <= self.hazards_size:
@@ -1605,7 +1594,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
                              'goal', alpha=self.render_goal_button_alpha)
 
         # Add indicator for nonzero cost
-        if kwargs.get('render_cost_indicator', True) and self._cost.get('cost', 0) > 0:
+        if kwargs.get('render_cost_indicator', True) and self._cost.get('cost', 0.0) > 0.0:
             self.render_sphere(self.world.robot_pos(), 0.25, COLOR_RED, alpha=.5)
 
         # Add indicator for nonzero cost
