@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import gym
-import gym.spaces
+from gym.spaces import Box, Dict
 import numpy as np
 from PIL import Image
 from copy import deepcopy
@@ -319,7 +319,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         # Load up a simulation of the robot, just to figure out observation space
         self.robot = Robot(self.robot_base)
 
-        self.action_space = gym.spaces.Box(-1, 1, (self.robot.nu,), dtype=np.float32)
+        self.action_space = Box(-1, 1, (self.robot.nu,), dtype=np.float32)
         self.build_observation_space()
         self.build_placements_dict()
 
@@ -453,31 +453,31 @@ class Engine(gym.Env, gym.utils.EzPickle):
         obs_space_dict = OrderedDict()  # See self.obs()
 
         if self.observe_freejoint:
-            obs_space_dict['freejoint'] = gym.spaces.Box(-np.inf, np.inf, (7,), dtype=np.float32)
+            obs_space_dict['freejoint'] = Box(-np.inf, np.inf, (7,), dtype=np.float64)
         if self.observe_com:
-            obs_space_dict['com'] = gym.spaces.Box(-np.inf, np.inf, (3,), dtype=np.float32)
+            obs_space_dict['com'] = Box(-np.inf, np.inf, (3,), dtype=np.float64)
         if self.observe_robot_xytheta:
-            obs_space_dict['robot_xytheta'] = gym.spaces.Box(-np.inf, np.inf, (3,), dtype=np.float32)
+            obs_space_dict['robot_xytheta'] = Box(-np.inf, np.inf, (3,), dtype=np.float64)
         if self.observe_sensors:
             for sensor in self.sensors_obs:  # Explicitly listed sensors
                 dim = self.robot.sensor_dim[sensor]
-                obs_space_dict[sensor] = gym.spaces.Box(-np.inf, np.inf, (dim,), dtype=np.float32)
+                obs_space_dict[sensor] = Box(-np.inf, np.inf, (dim,), dtype=np.float64)
             # Velocities don't have wraparound effects that rotational positions do
             # Wraparounds are not kind to neural networks
             # Whereas the angle 2*pi is very close to 0, this isn't true in the network
             # In theory the network could learn this, but in practice we simplify it
             # when the sensors_angle_components switch is enabled.
             for sensor in self.robot.hinge_vel_names:
-                obs_space_dict[sensor] = gym.spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
+                obs_space_dict[sensor] = Box(-np.inf, np.inf, (1,), dtype=np.float64)
             for sensor in self.robot.ballangvel_names:
-                obs_space_dict[sensor] = gym.spaces.Box(-np.inf, np.inf, (3,), dtype=np.float32)
+                obs_space_dict[sensor] = Box(-np.inf, np.inf, (3,), dtype=np.float64)
             # Angular positions have wraparound effects, so output something more friendly
             if self.sensors_angle_components:
                 # Single joints are turned into sin(x), cos(x) pairs
                 # These should be easier to learn for neural networks,
                 # Since for angles, small perturbations in angle give small differences in sin/cos
                 for sensor in self.robot.hinge_pos_names:
-                    obs_space_dict[sensor] = gym.spaces.Box(-np.inf, np.inf, (2,), dtype=np.float32)
+                    obs_space_dict[sensor] = Box(-np.inf, np.inf, (2,), dtype=np.float64)
                 # Quaternions are turned into 3x3 rotation matrices
                 # Quaternions have a wraparound issue in how they are normalized,
                 # where the convention is to change the sign so the first element to be positive.
@@ -489,81 +489,81 @@ class Engine(gym.Env, gym.utils.EzPickle):
                 # but right now we have very little code to support SO(3) roatations.
                 # Instead we use a 3x3 rotation matrix, which if normalized, smoothly varies as well.
                 for sensor in self.robot.ballquat_names:
-                    obs_space_dict[sensor] = gym.spaces.Box(-np.inf, np.inf, (3, 3), dtype=np.float32)
+                    obs_space_dict[sensor] = Box(-np.inf, np.inf, (3, 3), dtype=np.float64)
             else:
                 # Otherwise include the sensor without any processing
                 # TODO: comparative study of the performance with and without this feature.
                 for sensor in self.robot.hinge_pos_names:
-                    obs_space_dict[sensor] = gym.spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
+                    obs_space_dict[sensor] = Box(-np.inf, np.inf, (1,), dtype=np.float64)
                 for sensor in self.robot.ballquat_names:
-                    obs_space_dict[sensor] = gym.spaces.Box(-np.inf, np.inf, (4,), dtype=np.float32)
+                    obs_space_dict[sensor] = Box(-np.inf, np.inf, (4,), dtype=np.float64)
         if self.task == 'push':
             if self.observe_box_pos:
-                obs_space_dict['box_pos'] = gym.spaces.Box(-np.inf, np.inf, (2,), dtype=np.float32)
+                obs_space_dict['box_pos'] = Box(-np.inf, np.inf, (2,), dtype=np.float64)
             if self.observe_box_comp:
-                obs_space_dict['box_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape,), dtype=np.float32)
+                obs_space_dict['box_compass'] = Box(-1.0, 1.0, (self.compass_shape,), dtype=np.float64)
             if self.observe_box_lidar:
-                obs_space_dict['box_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+                obs_space_dict['box_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.observe_goal_pos:
-            obs_space_dict['goal_pos'] = gym.spaces.Box(-np.inf, np.inf, (2,), dtype=np.float32)
+            obs_space_dict['goal_pos'] = Box(-np.inf, np.inf, (2,), dtype=np.float64)
         if self.observe_goal_dist:
-            obs_space_dict['goal_dist'] = gym.spaces.Box(0.0, 1.0, (1,), dtype=np.float32)
+            obs_space_dict['goal_dist'] = Box(0.0, 1.0, (1,), dtype=np.float64)
         if self.observe_goal_comp:
-            obs_space_dict['goal_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape,), dtype=np.float32)
+            obs_space_dict['goal_compass'] = Box(-1.0, 1.0, (self.compass_shape,), dtype=np.float64)
         if self.observe_goal_lidar:
-            obs_space_dict['goal_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+            obs_space_dict['goal_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.task == 'circle' and self.observe_circle:
-            obs_space_dict['circle_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+            obs_space_dict['circle_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.observe_remaining:
-            obs_space_dict['remaining'] = gym.spaces.Box(0.0, 1.0, (1,), dtype=np.float32)
+            obs_space_dict['remaining'] = Box(0.0, 1.0, (1,), dtype=np.float64)
         if self.walls_num and self.observe_walls:
-            obs_space_dict['walls_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+            obs_space_dict['walls_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.observe_hazards:
             if self.observe_body_pos_comp:
-                obs_space_dict['hazards_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.hazards_num,), dtype=np.float32)
-                obs_space_dict['hazards_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.hazards_num,), dtype=np.float32)
+                obs_space_dict['hazards_pos'] = Box(-np.inf, np.inf, (2*self.hazards_num,), dtype=np.float64)
+                obs_space_dict['hazards_compass'] = Box(-1.0, 1.0, (self.compass_shape*self.hazards_num,), dtype=np.float64)
             else:
-                obs_space_dict['hazards_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+                obs_space_dict['hazards_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.observe_vases:
             if self.observe_body_pos_comp:
-                obs_space_dict['vases_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.vases_num,), dtype=np.float32)
-                obs_space_dict['vases_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.vases_num,), dtype=np.float32)
+                obs_space_dict['vases_pos'] = Box(-np.inf, np.inf, (2*self.vases_num,), dtype=np.float64)
+                obs_space_dict['vases_compass'] = Box(-1.0, 1.0, (self.compass_shape*self.vases_num,), dtype=np.float64)
             else:
-                obs_space_dict['vases_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+                obs_space_dict['vases_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.gremlins_num and self.observe_gremlins:
             if self.observe_body_pos_comp:
-                obs_space_dict['gremlins_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.gremlins_num,), dtype=np.float32)
-                obs_space_dict['gremlins_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.gremlins_num,), dtype=np.float32)
+                obs_space_dict['gremlins_pos'] = Box(-np.inf, np.inf, (2*self.gremlins_num,), dtype=np.float64)
+                obs_space_dict['gremlins_compass'] = Box(-1.0, 1.0, (self.compass_shape*self.gremlins_num,), dtype=np.float64)
             else:
-                obs_space_dict['gremlins_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+                obs_space_dict['gremlins_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.pillars_num and self.observe_pillars:
             if self.observe_body_pos_comp:
-                obs_space_dict['pillars_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.pillars_num,), dtype=np.float32)
-                obs_space_dict['pillars_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.pillars_num,), dtype=np.float32)
+                obs_space_dict['pillars_pos'] = Box(-np.inf, np.inf, (2*self.pillars_num,), dtype=np.float64)
+                obs_space_dict['pillars_compass'] = Box(-1.0, 1.0, (self.compass_shape*self.pillars_num,), dtype=np.float64)
             else:
-                obs_space_dict['pillars_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+                obs_space_dict['pillars_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.buttons_num and self.observe_buttons:
             if self.observe_body_pos_comp:
-                obs_space_dict['buttons_pos'] = gym.spaces.Box(-np.inf, np.inf, (2*self.buttons_num,), dtype=np.float32)
-                obs_space_dict['buttons_compass'] = gym.spaces.Box(-1.0, 1.0, (self.compass_shape*self.buttons_num,), dtype=np.float32)
+                obs_space_dict['buttons_pos'] = Box(-np.inf, np.inf, (2*self.buttons_num,), dtype=np.float64)
+                obs_space_dict['buttons_compass'] = Box(-1.0, 1.0, (self.compass_shape*self.buttons_num,), dtype=np.float64)
             else:
-                obs_space_dict['buttons_lidar'] = gym.spaces.Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float32)
+                obs_space_dict['buttons_lidar'] = Box(0.0, 1.0, (self.lidar_num_bins,), dtype=np.float64)
         if self.observe_qpos:
-            obs_space_dict['qpos'] = gym.spaces.Box(-np.inf, np.inf, (self.robot.nq,), dtype=np.float32)
+            obs_space_dict['qpos'] = Box(-np.inf, np.inf, (self.robot.nq,), dtype=np.float64)
         if self.observe_qvel:
-            obs_space_dict['qvel'] = gym.spaces.Box(-np.inf, np.inf, (self.robot.nv,), dtype=np.float32)
+            obs_space_dict['qvel'] = Box(-np.inf, np.inf, (self.robot.nv,), dtype=np.float64)
         if self.observe_ctrl:
-            obs_space_dict['ctrl'] = gym.spaces.Box(-np.inf, np.inf, (self.robot.nu,), dtype=np.float32)
+            obs_space_dict['ctrl'] = Box(-np.inf, np.inf, (self.robot.nu,), dtype=np.float64)
         if self.observe_vision:
             cols, rows = self.vision_size
-            obs_space_dict['vision'] = gym.spaces.Box(0, 1.0, (rows, cols, 3), dtype=np.float32)
+            obs_space_dict['vision'] = Box(0, 1.0, (rows, cols, 3), dtype=np.float64)
         # Flatten it ourselves
         self.obs_space_dict = obs_space_dict
         if self.observation_flatten:
             self.obs_flat_size = sum([np.prod(i.shape) for i in self.obs_space_dict.values()])
-            self.observation_space = gym.spaces.Box(-np.inf, np.inf, (self.obs_flat_size,), dtype=np.float32)
+            self.observation_space = Box(-np.inf, np.inf, (self.obs_flat_size,), dtype=np.float64)
         else:
-            self.observation_space = gym.spaces.Dict(obs_space_dict)
+            self.observation_space = Dict(obs_space_dict)
 
     def toggle_observation_space(self):
         self.observation_flatten = not(self.observation_flatten)
